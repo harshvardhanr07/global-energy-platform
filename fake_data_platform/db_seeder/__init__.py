@@ -1,0 +1,1 @@
+from .run_seeder import main as run_seeder
