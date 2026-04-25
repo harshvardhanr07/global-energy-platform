@@ -25,6 +25,7 @@ services:
       - "8000:8000"
     volumes:
       - .:/app
+      - ./output/csv:/app/outout/csv
     env_file:
       - .env
     depends_on:
