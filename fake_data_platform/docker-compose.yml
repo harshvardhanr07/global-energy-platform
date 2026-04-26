@@ -21,11 +21,13 @@ services:
   api_simulator:
     build: .
     container_name: api_simulator
+    command: python api_simulator/main.py
     ports:
       - "8000:8000"
     volumes:
       - .:/app
       - ./output/csv:/app/outout/csv
+      - ./output/parquet:/app/output/parquet
     env_file:
       - .env
     depends_on:
@@ -33,6 +35,12 @@ services:
         condition: service_healthy
     networks:
       - energy_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s 
     
 
   pgadmin:

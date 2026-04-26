@@ -40,3 +40,33 @@ PARQUET_DIR = os.path.join(BASE_DIR, 'output', 'parquet')
 
 # ── Backfill settings ──────────────────────────────────────────────────────
 BACKFILL_YEARS = 2   # how many years of historical data to generate
+
+# ── anomaly probabilities ──────────────────────────────────────────────────
+#probabilities to create anomalies in consumption comparing with invoices
+ANOMALY_CONFIG = {
+    "normal_probability":       0.90,
+    "high_anomaly_probability": 0.05,
+    "low_anomaly_probability":  0.05,
+}
+
+# ── Anomaly factos ─────────────────────────────────────────────────────────
+#factors of anomly to keep the consumption with bit variation
+ANOMALY_FACTORS = {
+    "normal": {"min": 0.92, "max": 0.99},
+    "high":   {"min": 1.02, "max": 1.10},
+    "low":    {"min": 0.50, "max": 0.70},
+}
+
+# ── Usage type weights ─────────────────────────────────────────────────────
+# Relative distribution of total electricity across 7 usage types.
+# Normalised to sum to 1.0 at runtime in generator.py and backfill.py.
+# Based on typical commercial building energy breakdown.
+USAGE_WEIGHTS = {
+    "heating":     0.25,
+    "cooling":     0.20,
+    "lighting":    0.15,
+    "ventilation": 0.10,
+    "ups":         0.05,
+    "it":          0.15,
+    "restaurant":  0.10,
+}

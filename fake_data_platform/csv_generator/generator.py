@@ -14,7 +14,7 @@ import logging
 from datetime import date
 from calendar import monthrange
 
-from config import (
+from csv_config  import (
     UNITS_BY_COUNTRY,
     BASE_CONSUMPTION_PER_SQM,
     UNIT_CONVERSION,

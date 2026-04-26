@@ -6,3 +6,8 @@ numpy
 faker
 python-dotenv
 pydantic
+APScheduler
+fastapi
+uvicorn[standard]
+pyarrow       
+APScheduler==3.10.4
