@@ -97,7 +97,7 @@ def main():
 
     # Exit with error code if any ingestion failed — useful for Airflow later
     sys.exit(1 if failures else 0)
-
+s
 
 if __name__ == "__main__":
     main()
