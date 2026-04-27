@@ -1,5 +1,5 @@
 from ingestion.base.base_ingestor import BaseIngestor, BronzeConfig
-from pyspark.sql import SparkSession
+from pyspark.sql import SparkSession, DataFrame
 
 class CsvIngestor(BaseIngestor):
     def __init__(self, 
@@ -13,7 +13,7 @@ class CsvIngestor(BaseIngestor):
         self.has_header     = has_header
         self.infer_schema   = infer_schema
     
-    def extract(self):
+    def extract(self) -> DataFrame:
         return (self.spark.read
                 .option("header", self.has_header)
                 .option("inferSchema", self.infer_schema)
