@@ -21,18 +21,16 @@ from ingestion.jobs.db_ingestor import DbIngestor
 # ---------------------------------------------------------------------------
 BRONZE_ROOT  = os.getenv("BRONZE_ROOT", "/data/bronze")
 CSV_DIR      = os.getenv("CSV_INPUT_DIR", "/data/raw/csv")
-API_BASE_URL = os.getenv("API_BASE_URL", "http://api-simulator:8000")
-DB_JDBC_URL  = os.getenv("DB_JDBC_URL", "jdbc:postgresql://postgres:5432/energy_db")
-DB_USER      = os.getenv("DB_USER", "energy_user")
-DB_PASSWORD  = os.getenv("DB_PASSWORD", "energy_pass")
+API_BASE_URL = os.getenv("API_BASE_URL")
+DB_JDBC_URL  = os.getenv("DB_JDBC_URL")
+DB_USER      = os.getenv("DB_USER")
+DB_PASSWORD  = os.getenv("DB_PASSWORD")
 
 
 def run_csv(spark) -> list:
-    # Ingest CSV files produced by fake_data_platform csv_generator
+    # All invoice CSVs are flat in one folder, named invoices_YYYY_MM.csv
     tables = {
-        "energy_readings": f"{CSV_DIR}/energy_readings/*.csv",
-        "plants":          f"{CSV_DIR}/plants/*.csv",
-        "countries":       f"{CSV_DIR}/countries/*.csv",
+        "invoices": f"{CSV_DIR}/invoices_*.csv",
     }
     results = []
     for table_name, path in tables.items():
@@ -43,10 +41,9 @@ def run_csv(spark) -> list:
 
 
 def run_api(spark) -> list:
-    # Ingest data from fake_data_platform API simulator endpoints
+    # Endpoints available on the fake_data_platform API simulator
     endpoints = {
-        "live_readings":  "/api/v1/live-readings",
-        "plant_metadata": "/api/v1/plants",
+        "sites":  "/sites",
     }
     results = []
     for table_name, endpoint in endpoints.items():
@@ -57,10 +54,12 @@ def run_api(spark) -> list:
 
 
 def run_db(spark) -> list:
-    # Ingest PostgreSQL tables seeded by fake_data_platform db_seeder
+    # Tables seeded by fake_data_platform db_seeder
     tables = {
-        "dim_plants":       "public.plants",
-        "fact_consumption": "public.energy_consumption",
+        "site_profile":         "public.site_profile",
+        "site_occupancy":       "public.site_occupancy",
+        "site_profile_history": "public.site_profile_history",
+        "site_status_history":  "public.site_status_history",
     }
     results = []
     for table_name, db_table in tables.items():
@@ -97,7 +96,6 @@ def main():
 
     # Exit with error code if any ingestion failed — useful for Airflow later
     sys.exit(1 if failures else 0)
-s
 
 if __name__ == "__main__":
     main()

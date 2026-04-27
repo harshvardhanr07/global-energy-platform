@@ -31,11 +31,11 @@ class IngestionResult:
 class BronzeConfig:
     # Holds all configuration needed to write a Bronze Parquet table
     # Each ingestor receives one of these at construction time
-    bronze_root: str = "/data/bronze"       # root folder for all Bronze output
-    source_name: str = ""                    # e.g. "csv", "api", "db"
-    table_name: str = ""                     # e.g. "energy_readings"
-    partition_by: list = None                # partition columns for Parquet
-    write_mode: str = "append"               # append | overwrite
+    bronze_root: str = "/data/bronze"
+    source_name: str = ""
+    table_name: str = ""
+    partition_by: list = None
+    write_mode: str = "append"
 
     def __post_init__(self):
         # Default partition_by here to avoid mutable default argument issue
@@ -51,4 +51,59 @@ class BaseIngestor(ABC):
 
     @abstractmethod
     def extract(self) -> DataFrame:
-        # Subclass
+        # Subclasses implement this to read from their source
+        ...
+
+    def _add_metadata(self, df: DataFrame) -> DataFrame:
+        # Adds three audit columns to every Bronze table:
+        #   _ingested_at   → UTC timestamp of when the job ran
+        #   _source        → which source system produced this data
+        #   ingestion_date → date partition used by Parquet partitionBy
+        now = datetime.now(tz=timezone.utc)
+        return (
+            df
+            .withColumn("_ingested_at", F.lit(now.isoformat()))
+            .withColumn("_source", F.lit(self.config.source_name))
+            .withColumn("ingestion_date", F.lit(now.strftime("%Y-%m-%d")))
+        )
+
+    def _output_path(self) -> str:
+        # Builds the Bronze output path: bronze_root/source_name/table_name
+        return str(
+            Path(self.config.bronze_root) / self.config.source_name / self.config.table_name
+        )
+
+    def run(self) -> IngestionResult:
+        # Orchestrates the full ingestion:
+        #   1. extract raw data from source
+        #   2. add metadata columns
+        #   3. write Parquet to Bronze
+        #   4. return IngestionResult with row count and status
+        started_at = datetime.now(tz=timezone.utc)
+        output_path = self._output_path()
+        try:
+            df = self.extract()
+            df = self._add_metadata(df)
+            df.write.mode(self.config.write_mode).partitionBy(*self.config.partition_by).parquet(output_path)
+            rows = df.count()
+            return IngestionResult(
+                source=self.config.source_name,
+                table=self.config.table_name,
+                rows_written=rows,
+                output_path=output_path,
+                started_at=started_at,
+                finished_at=datetime.now(tz=timezone.utc),
+                success=True
+            )
+        except Exception as e:
+            # Catch all exceptions so one failing table doesn't stop the others
+            return IngestionResult(
+                source=self.config.source_name,
+                table=self.config.table_name,
+                rows_written=0,
+                output_path=output_path,
+                started_at=started_at,
+                finished_at=datetime.now(tz=timezone.utc),
+                success=False,
+                error=str(e)
+            )

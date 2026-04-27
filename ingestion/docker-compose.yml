@@ -1,6 +1,8 @@
 services:
   ingestion:
-    build: .
+    build:
+      context: .
+      network: host
     container_name: gep-ingestion
     env_file:
       - .env
@@ -13,9 +15,9 @@ services:
       - DB_PASSWORD=${DB_PASSWORD}
     volumes:
       - bronze_data:/data/bronze
-      - csv_raw:/data/raw/csv
+      - ~/projects/global-energy-platform/fake_data_platform/output/csv:/data/raw/csv
     networks:
-      - energy_network
+      - fake_data_platform_energy_network
     restart: "no"
 
 volumes:
@@ -23,5 +25,5 @@ volumes:
   csv_raw:
 
 networks:
-  energy_network:
+  fake_data_platform_energy_network:
     external: true
