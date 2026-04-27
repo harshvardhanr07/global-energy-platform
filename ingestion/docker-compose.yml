@@ -1,0 +1,27 @@
+services:
+  ingestion:
+    build: .
+    container_name: gep-ingestion
+    env_file:
+      - .env
+    environment:
+      - BRONZE_ROOT=${BRONZE_ROOT}
+      - CSV_INPUT_DIR=${CSV_INPUT_DIR}
+      - API_BASE_URL=${API_BASE_URL}
+      - DB_JDBC_URL=${DB_JDBC_URL}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+    volumes:
+      - bronze_data:/data/bronze
+      - csv_raw:/data/raw/csv
+    networks:
+      - energy_network
+    restart: "no"
+
+volumes:
+  bronze_data:
+  csv_raw:
+
+networks:
+  energy_network:
+    external: true
