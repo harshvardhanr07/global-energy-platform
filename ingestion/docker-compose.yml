@@ -13,6 +13,11 @@ services:
       - DB_JDBC_URL=${DB_JDBC_URL}
       - DB_USER=${DB_USER}
       - DB_PASSWORD=${DB_PASSWORD}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_REGION=${AWS_REGION}
+      - BRONZE_PATH=${BRONZE_PATH}
+      - SILVER_PATH=${SILVER_PATH}
     volumes:
       - bronze_data:/data/bronze
       - ~/projects/global-energy-platform/fake_data_platform/output/csv:/data/raw/csv

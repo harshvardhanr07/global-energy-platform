@@ -3,6 +3,7 @@
 # local Docker mode. All ingestion jobs call get_spark() to
 # obtain their session instead of creating one directly.
 
+import os
 from pyspark.sql import SparkSession
 
 
@@ -10,12 +11,17 @@ def get_spark(app_name: str = "GlobalEnergyPlatform") -> SparkSession:
     return (
         SparkSession.builder
         .appName(app_name)
-        .master("local[*]")                 # use all available cores in Docker
-        .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer")  # faster serialisation
-        .config("spark.sql.parquet.compression.codec", "snappy")                   # compressed Parquet output
-        .config("spark.jars.packages", "org.postgresql:postgresql:42.7.3")
-        .config("spark.sql.shuffle.partitions", "4")                               # low value tuned for local mode
-        .config("spark.driver.memory", "2g")                                       # memory cap for Docker container
-        .config("spark.sql.adaptive.enabled", "true")                              # let Spark optimise query plans
-        .getOrCreate()                      # reuse existing session if one already exists
+        .master("local[*]")
+        .config("spark.hadoop.fs.s3a.access.key", os.environ["AWS_ACCESS_KEY_ID"])
+        .config("spark.hadoop.fs.s3a.secret.key", os.environ["AWS_SECRET_ACCESS_KEY"])
+        .config("spark.hadoop.fs.s3a.endpoint", "s3.amazonaws.com")
+        .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
+        .config(
+            "spark.hadoop.fs.s3a.aws.credentials.provider",
+            "com.amazonaws.auth.EnvironmentVariableCredentialsProvider"
+        )
+        .config("spark.hadoop.fs.s3a.path.style.access", "false")
+        .config("spark.hadoop.fs.s3a.connection.ssl.enabled", "true")
+        .config("spark.sql.session.timeZone", "UTC")
+        .getOrCreate()
     )
