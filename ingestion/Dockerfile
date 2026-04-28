@@ -26,4 +26,4 @@ COPY . /app/
 
 RUN mkdir -p /data/bronze /data/raw/csv
 
-CMD ["python", "-m", "ingestion.run_ingestion"]
+CMD ["python", "-m", "run_ingestion"]

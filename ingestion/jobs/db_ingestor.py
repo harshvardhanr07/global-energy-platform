@@ -1,10 +1,10 @@
 # db_ingestor.py
 # Bronze ingestor for PostgreSQL tables seeded by fake_data_platform's db_seeder.
-# Uses PySpark's JDBC reader to pull tables directly from PostgreSQL
-# and land them as raw Parquet in the Bronze layer.
+# Uses PySpark JDBC to pull tables from PostgreSQL and land them
+# as raw Parquet in the Bronze layer on S3.
 # Supports parallel reads via partition_column for large tables.
 
-from ingestion.base.base_ingestor import BaseIngestor, BronzeConfig
+from base.base_ingestor import BaseIngestor, BronzeConfig
 from pyspark.sql import SparkSession, DataFrame
 
 
@@ -20,7 +20,7 @@ class DbIngestor(BaseIngestor):
                  partition_column: str = None,  # numeric/date column to split parallel reads
                  lower_bound: str = None,        # min value of partition_column
                  upper_bound: str = None,        # max value of partition_column
-                 num_partitions: int = 4):       # number of parallel JDBC reads
+                 num_partitions: int = 4):       # number of parallel JDBC tasks
         super().__init__(spark, config)
         self.jdbc_url = jdbc_url
         self.db_table = db_table

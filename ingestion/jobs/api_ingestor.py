@@ -1,10 +1,10 @@
 # api_ingestor.py
 # Bronze ingestor for the fake_data_platform API simulator.
-# Paginates through a FastAPI endpoint, collects all records,
-# and lands them as raw Parquet in the Bronze layer.
+# Paginates through FastAPI endpoints, collects all records,
+# and lands them as raw Parquet in the Bronze layer on S3.
 
 import requests
-from ingestion.base.base_ingestor import BaseIngestor, BronzeConfig
+from base.base_ingestor import BaseIngestor, BronzeConfig
 from pyspark.sql import SparkSession, DataFrame
 
 
@@ -15,7 +15,7 @@ class ApiIngestor(BaseIngestor):
                  config: BronzeConfig,
                  base_url: str,
                  endpoint: str,
-                 page_size: int = 500):     # records per API request
+                 page_size: int = 500):    # records per API request
         super().__init__(spark, config)
         self.base_url = base_url
         self.endpoint = endpoint
@@ -23,17 +23,17 @@ class ApiIngestor(BaseIngestor):
 
     def _fetch_page(self, page: int) -> list:
         # Fetches a single page from the API
-        # Supports both bare list responses and {"data": [...]} shaped responses
+        # Supports both bare list [] and {"data": [...]} shaped responses
         params = {
             "page": page,
             "page_size": self.page_size
         }
         response = requests.get(f"{self.base_url}{self.endpoint}", params=params)
-        response.raise_for_status()     # raise exception on 4xx/5xx responses
+        response.raise_for_status()    # raise exception on 4xx/5xx responses
         payload = response.json()
         if isinstance(payload, list):
             return payload
-        return payload.get("data", [])  # unwrap {"data": [...]} envelope
+        return payload.get("data", []) # unwrap {"data": [...]} envelope
 
     def _paginate(self) -> list:
         # Loops through all pages until the API returns an empty page
@@ -43,10 +43,10 @@ class ApiIngestor(BaseIngestor):
         while True:
             records = self._fetch_page(page_no)
             if not records:
-                break                           # empty response — no more data
+                break                          # empty response — no more data
             flat.extend(records)
             if len(records) < self.page_size:
-                break                           # partial page — last page reached
+                break                          # partial page — last page reached
             page_no += 1
         return flat
 

@@ -16,7 +16,6 @@ services:
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
       - AWS_REGION=${AWS_REGION}
-      - BRONZE_PATH=${BRONZE_PATH}
       - SILVER_PATH=${SILVER_PATH}
     volumes:
       - bronze_data:/data/bronze

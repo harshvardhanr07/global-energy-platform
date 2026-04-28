@@ -4,30 +4,30 @@
 # prints a summary of results at the end.
 #
 # Usage inside Docker:
-#   python -m ingestion.run_ingestion
+#   python -m run_ingestion
 #
 # Environment variables are read from .env via docker-compose
 
 import os
 import sys
-from ingestion.base.spark_session import get_spark
-from ingestion.base.base_ingestor import BronzeConfig, IngestionResult
-from ingestion.jobs.csv_ingestor import CsvIngestor
-from ingestion.jobs.api_ingestor import ApiIngestor
-from ingestion.jobs.db_ingestor import DbIngestor
+from base.spark_session import get_spark
+from base.base_ingestor import BronzeConfig, IngestionResult
+from jobs.csv_ingestor import CsvIngestor
+from jobs.api_ingestor import ApiIngestor
+from jobs.db_ingestor import DbIngestor
 
-# ---------------------------------------------------------------------------
-# Config from environment variables — values come from .env via docker-compose
-# ---------------------------------------------------------------------------
-BRONZE_ROOT  = os.getenv("BRONZE_ROOT", "/data/bronze")
-CSV_DIR      = os.getenv("CSV_INPUT_DIR", "/data/raw/csv")
-API_BASE_URL = os.getenv("API_BASE_URL")
-DB_JDBC_URL  = os.getenv("DB_JDBC_URL")
-DB_USER      = os.getenv("DB_USER")
-DB_PASSWORD  = os.getenv("DB_PASSWORD")
+# ── Config from environment variables ────────────────────────────────────────
+# All values come from .env via docker-compose environment block
+BRONZE_ROOT  = os.getenv("BRONZE_ROOT", "/data/bronze")             # s3a:// in production
+CSV_DIR      = os.getenv("CSV_INPUT_DIR", "/data/raw/csv")          # mounted from fake_data_platform
+API_BASE_URL = os.getenv("API_BASE_URL", "http://api_simulator:8000")
+DB_JDBC_URL  = os.getenv("DB_JDBC_URL", "jdbc:postgresql://postgres:5432/energy_fake")
+DB_USER      = os.getenv("DB_USER", "energy_user")
+DB_PASSWORD  = os.getenv("DB_PASSWORD", "energy_pass")
 
 
 def run_csv(spark) -> list:
+    # Ingest CSV files produced by fake_data_platform csv_generator
     # All invoice CSVs are flat in one folder, named invoices_YYYY_MM.csv
     tables = {
         "invoices": f"{CSV_DIR}/invoices_*.csv",
@@ -41,9 +41,9 @@ def run_csv(spark) -> list:
 
 
 def run_api(spark) -> list:
-    # Endpoints available on the fake_data_platform API simulator
+    # Ingest data from fake_data_platform API simulator endpoints
     endpoints = {
-        "sites":  "/sites",
+        "sites": "/sites",
     }
     results = []
     for table_name, endpoint in endpoints.items():
@@ -54,7 +54,7 @@ def run_api(spark) -> list:
 
 
 def run_db(spark) -> list:
-    # Tables seeded by fake_data_platform db_seeder
+    # Ingest PostgreSQL tables seeded by fake_data_platform db_seeder
     tables = {
         "site_profile":         "public.site_profile",
         "site_occupancy":       "public.site_occupancy",
@@ -64,7 +64,13 @@ def run_db(spark) -> list:
     results = []
     for table_name, db_table in tables.items():
         config = BronzeConfig(bronze_root=BRONZE_ROOT, source_name="db", table_name=table_name)
-        ingestor = DbIngestor(spark, config, jdbc_url=DB_JDBC_URL, db_table=db_table, db_user=DB_USER, db_password=DB_PASSWORD)
+        ingestor = DbIngestor(
+            spark, config,
+            jdbc_url=DB_JDBC_URL,
+            db_table=db_table,
+            db_user=DB_USER,
+            db_password=DB_PASSWORD
+        )
         results.append(ingestor.run())
     return results
 
@@ -96,6 +102,7 @@ def main():
 
     # Exit with error code if any ingestion failed — useful for Airflow later
     sys.exit(1 if failures else 0)
+
 
 if __name__ == "__main__":
     main()

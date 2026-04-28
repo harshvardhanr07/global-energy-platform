@@ -1,9 +1,9 @@
 # csv_ingestor.py
 # Bronze ingestor for CSV files produced by fake_data_platform's csv_generator.
 # Reads one or more CSV files from a path or glob pattern and
-# lands them as raw Parquet in the Bronze layer.
+# lands them as raw Parquet in the Bronze layer on S3.
 
-from ingestion.base.base_ingestor import BaseIngestor, BronzeConfig
+from base.base_ingestor import BaseIngestor, BronzeConfig
 from pyspark.sql import SparkSession, DataFrame
 
 
@@ -14,7 +14,7 @@ class CsvIngestor(BaseIngestor):
                  config: BronzeConfig,
                  csv_path: str,
                  has_header: bool = True,
-                 infer_schema: bool = False):   # False at Bronze — Silver will cast types
+                 infer_schema: bool = False):  # False at Bronze — Silver will cast types later
         super().__init__(spark, config)
         self.csv_path = csv_path
         self.has_header = has_header
@@ -28,7 +28,7 @@ class CsvIngestor(BaseIngestor):
             self.spark.read
             .option("header", self.has_header)
             .option("inferSchema", self.infer_schema)
-            .option("multiLine", True)      # handles values containing line breaks
-            .option("escape", '"')          # handles quoted fields with commas
+            .option("multiLine", True)   # handles values containing line breaks
+            .option("escape", '"')       # handles quoted fields containing commas
             .csv(self.csv_path)
         )

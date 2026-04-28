@@ -6,7 +6,6 @@
 
 from dataclasses import dataclass
 from abc import ABC, abstractmethod
-from pathlib import Path
 from datetime import datetime, timezone
 from typing import Optional
 from pyspark.sql import DataFrame, SparkSession
@@ -16,29 +15,29 @@ from pyspark.sql import functions as F
 @dataclass
 class IngestionResult:
     # Stores the outcome of a single ingestion run
-    # Used by run_ingestion.py to print the summary
-    source: str
-    table: str
-    rows_written: int
-    output_path: str
-    started_at: datetime
-    finished_at: datetime
-    success: bool
-    error: str = None
+    # Returned by run() and used by run_ingestion.py to print the summary
+    source: str                  # which source: csv, api, or db
+    table: str                   # table name e.g. invoices, sites
+    rows_written: int            # number of rows written to Bronze
+    output_path: str             # full S3 or local path written to
+    started_at: datetime         # UTC timestamp when run() was called
+    finished_at: datetime        # UTC timestamp when run() completed
+    success: bool                # True if write succeeded
+    error: str = None            # exception message if success=False
 
 
 @dataclass
 class BronzeConfig:
     # Holds all configuration needed to write a Bronze Parquet table
     # Each ingestor receives one of these at construction time
-    bronze_root: str = "/data/bronze"
-    source_name: str = ""
-    table_name: str = ""
-    partition_by: list = None
-    write_mode: str = "append"
+    bronze_root: str = "/data/bronze"   # root path — set to s3a:// in production
+    source_name: str = ""               # source identifier: csv, api, or db
+    table_name: str = ""                # output table name e.g. invoices
+    partition_by: list = None           # Parquet partition columns
+    write_mode: str = "append"          # append | overwrite
 
     def __post_init__(self):
-        # Default partition_by here to avoid mutable default argument issue
+        # Set default here to avoid mutable default argument issue with dataclasses
         if self.partition_by is None:
             self.partition_by = ["ingestion_date"]
 
@@ -52,6 +51,7 @@ class BaseIngestor(ABC):
     @abstractmethod
     def extract(self) -> DataFrame:
         # Subclasses implement this to read from their source
+        # and return a raw Spark DataFrame
         ...
 
     def _add_metadata(self, df: DataFrame) -> DataFrame:
@@ -69,9 +69,9 @@ class BaseIngestor(ABC):
 
     def _output_path(self) -> str:
         # Builds the Bronze output path: bronze_root/source_name/table_name
-        return str(
-            Path(self.config.bronze_root) / self.config.source_name / self.config.table_name
-        )
+        # IMPORTANT: uses string join not pathlib.Path — Path collapses
+        # s3a://bucket into s3a:/bucket (strips one slash), breaking S3 writes
+        return f"{self.config.bronze_root.rstrip('/')}/{self.config.source_name}/{self.config.table_name}"
 
     def run(self) -> IngestionResult:
         # Orchestrates the full ingestion:
