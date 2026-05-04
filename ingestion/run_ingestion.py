@@ -1,34 +1,44 @@
 # run_ingestion.py
-# Main entrypoint for a full Bronze ingestion run.
-# Wires all three ingestors (CSV, API, DB) together and
-# prints a summary of results at the end.
+# Main entrypoint for the Bronze ingestion pipeline.
+# Wires all ingestors together and prints a summary on completion.
 #
 # Usage inside Docker:
-#   python -m ingestion.run_ingestion
+#   python run_ingestion.py
 #
-# Environment variables are read from .env via docker-compose
+# Environment variables are loaded from .env via docker-compose
 
 import os
 import sys
-from ingestion.base.spark_session import get_spark
-from ingestion.base.base_ingestor import BronzeConfig, IngestionResult
-from ingestion.jobs.csv_ingestor import CsvIngestor
-from ingestion.jobs.api_ingestor import ApiIngestor
-from ingestion.jobs.db_ingestor import DbIngestor
+import psycopg2
+from base.spark_session import get_spark
+from base.base_ingestor import BronzeConfig, IngestionResult
+from base.watermark import WatermarkManager
+from base.ingestion_log import IngestionLogger
+from jobs.csv_ingestor import CsvIngestor
+from jobs.api_ingestor import ApiIngestor
+from jobs.db_ingestor import DbIngestor
+from jobs.timeseries_api_ingestor import TimeSeriesApiIngestor
 
-# ---------------------------------------------------------------------------
-# Config from environment variables — values come from .env via docker-compose
-# ---------------------------------------------------------------------------
-BRONZE_ROOT  = os.getenv("BRONZE_ROOT", "/data/bronze")
+# ── Environment variables ────────────────────────────────────────────────────
+BRONZE_ROOT  = os.getenv("BRONZE_ROOT",  "/data/bronze")
 CSV_DIR      = os.getenv("CSV_INPUT_DIR", "/data/raw/csv")
-API_BASE_URL = os.getenv("API_BASE_URL")
-DB_JDBC_URL  = os.getenv("DB_JDBC_URL")
-DB_USER      = os.getenv("DB_USER")
-DB_PASSWORD  = os.getenv("DB_PASSWORD")
+API_BASE_URL = os.getenv("API_BASE_URL",  "http://api_simulator:8000")
+DB_JDBC_URL  = os.getenv("DB_JDBC_URL",   "jdbc:postgresql://postgres:5432/energy_fake")
+DB_USER      = os.getenv("DB_USER",       "energy_user")
+DB_PASSWORD  = os.getenv("DB_PASSWORD",   "energy_pass")
+DB_HOST      = os.getenv("DB_HOST",       "postgres")
+DB_PORT      = os.getenv("DB_PORT",       "5432")
+DB_NAME      = os.getenv("DB_NAME",       "energy_fake")
+
+# All site IDs available in the platform
+SITE_IDS = [
+    "SITE_001", "SITE_002", "SITE_003", "SITE_004", "SITE_005",
+    "SITE_006", "SITE_007", "SITE_008", "SITE_009", "SITE_010",
+]
 
 
 def run_csv(spark) -> list:
-    # All invoice CSVs are flat in one folder, named invoices_YYYY_MM.csv
+    """Ingest invoice CSV files produced by fake_data_platform csv_generator."""
     tables = {
         "invoices": f"{CSV_DIR}/invoices_*.csv",
     }
@@ -41,9 +51,9 @@ def run_csv(spark) -> list:
 
 
 def run_api(spark) -> list:
-    # Endpoints available on the fake_data_platform API simulator
+    """Ingest static API endpoints from the fake_data_platform API simulator."""
     endpoints = {
-        "sites":  "/sites",
+        "sites": "/sites",
     }
     results = []
     for table_name, endpoint in endpoints.items():
@@ -54,7 +64,7 @@ def run_api(spark) -> list:
 
 
 def run_db(spark) -> list:
-    # Tables seeded by fake_data_platform db_seeder
+    """Ingest PostgreSQL tables seeded by fake_data_platform db_seeder."""
     tables = {
         "site_profile":         "public.site_profile",
         "site_occupancy":       "public.site_occupancy",
@@ -64,45 +74,68 @@ def run_db(spark) -> list:
     results = []
     for table_name, db_table in tables.items():
         config = BronzeConfig(bronze_root=BRONZE_ROOT, source_name="db", table_name=table_name)
-        ingestor = DbIngestor(spark, config, jdbc_url=DB_JDBC_URL, db_table=db_table, db_user=DB_USER, db_password=DB_PASSWORD)
+        ingestor = DbIngestor(
+            spark, config,
+            jdbc_url=DB_JDBC_URL,
+            db_table=db_table,
+            db_user=DB_USER,
+            db_password=DB_PASSWORD,
+        )
         results.append(ingestor.run())
     return results
 
-def run_timeseries_api(spark) -> list:
-    # Tables seeded by fake_data_platform db_seeder
-    tables = {
-        "site_profile":         "public.site_profile",
-        "site_occupancy":       "public.site_occupancy",
-        "site_profile_history": "public.site_profile_history",
-        "site_status_history":  "public.site_status_history",
-    }
+
+def run_timeseries_api(spark, db_conn) -> list:
     results = []
-    for table_name, db_table in tables.items():
-        config = BronzeConfig(bronze_root=BRONZE_ROOT, source_name="db", table_name=table_name)
-        ingestor = DbIngestor(spark, config, jdbc_url=DB_JDBC_URL, db_table=db_table, db_user=DB_USER, db_password=DB_PASSWORD)
-        results.append(ingestor.run())
+    for endpoint_name in ["consumption", "temperature"]:
+        config = BronzeConfig(
+            bronze_root=BRONZE_ROOT,
+            source_name="api",
+            table_name=f"site_{endpoint_name}",
+        )
+        ingestor = TimeSeriesApiIngestor(
+            spark=spark,
+            config=config,
+            base_url=API_BASE_URL,
+            endpoint_name=endpoint_name,
+            site_ids=SITE_IDS,
+            db_conn=db_conn,
+        )
+        results.extend(ingestor.run())
     return results
-
 
 def main():
-    spark = get_spark()
-    results = []
+    spark = get_spark("GEP-Ingestion")
 
-    # Run all three sources — failures are caught inside each ingestor
-    # so one bad table doesn't stop the rest
-    results.extend(run_csv(spark))
-    results.extend(run_api(spark))
-    results.extend(run_db(spark))
-    results.extend(run_timeseries_api(spark))
+    # Open a psycopg2 connection for watermark and ingestion log (timeseries only)
+    db_conn = psycopg2.connect(
+        host=DB_HOST,
+        port=DB_PORT,
+        dbname=DB_NAME,
+        user=DB_USER,
+        password=DB_PASSWORD,
+    )
 
-    spark.stop()
+    all_results: list = []
 
-    # Print summary
+    try:
+        # Run all sources — failures inside each ingestor are caught individually
+        # so one bad table does not stop the rest
+        all_results.extend(run_csv(spark))
+        all_results.extend(run_api(spark))
+        all_results.extend(run_db(spark))
+        all_results.extend(run_timeseries_api(spark, db_conn))
+
+    finally:
+        spark.stop()
+        db_conn.close()
+
+    # ── Summary ──────────────────────────────────────────────────────────────
     print("\n" + "=" * 60)
     print("INGESTION SUMMARY")
     print("=" * 60)
     failures = 0
-    for r in results:
+    for r in all_results:
         status = "✓" if r.success else "✗"
         print(f"  {status}  {r.source:<6} / {r.table:<25}  {r.rows_written:>6} rows")
         if not r.success:
@@ -112,6 +145,7 @@ def main():
 
     # Exit with error code if any ingestion failed — useful for Airflow later
     sys.exit(1 if failures else 0)
+
 
 if __name__ == "__main__":
     main()

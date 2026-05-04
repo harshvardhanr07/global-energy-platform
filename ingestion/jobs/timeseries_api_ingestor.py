@@ -1,26 +1,25 @@
 import requests
-import psycopg2
 from datetime import datetime, timezone
-from dateutil.relativedelta import relativedelta
 from calendar import monthrange
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 from base.base_ingestor import BronzeConfig
 from base.watermark import WatermarkManager
 from base.ingestion_log import IngestionLogger
+from base.base_ingestor import BronzeConfig, IngestionResult
 
-class TimeSeriesApiIngestor():
+class TimeSeriesApiIngestor:
 
     def __init__(
-            self, 
-            spark: SparkSession,
-            config: BronzeConfig, 
-            base_url: str,
-            endpoint_name: str,
-            site_ids, 
-            db_conn, 
-            start_ts=datetime(2024, 4, 1, 0, 0, 0)
-        ):
+        self,
+        spark: SparkSession,
+        config: BronzeConfig,
+        base_url: str,
+        endpoint_name: str,
+        site_ids: list,
+        db_conn,
+        start_ts: datetime = datetime(2024, 4, 1, 0, 0, 0),
+    ):
         self.spark = spark
         self.config = config
         self.base_url = base_url
@@ -30,8 +29,8 @@ class TimeSeriesApiIngestor():
         self.start_ts = start_ts
         self.watermark = WatermarkManager(db_conn)
         self.logger = IngestionLogger(db_conn)
-    
-    def _get_months_to_fetch(self, site_id):
+
+    def _get_months_to_fetch(self, site_id: str) -> list:
         """
         Returns a list of (from_ts, to_ts) datetime tuples — one per full calendar month —
         starting from the month after last_ingested_ts up to and including the current month.
@@ -68,8 +67,8 @@ class TimeSeriesApiIngestor():
                 month += 1
 
         return months
-    
-    def _fetch_month(self, site_id, from_ts, to_ts):
+
+    def _fetch_month(self, site_id: str, from_ts: datetime, to_ts: datetime) -> list:
         """
         Fetches data from the API for a given site and time range.
         from_ts and to_ts are converted to Unix integer timestamps.
@@ -88,105 +87,89 @@ class TimeSeriesApiIngestor():
             )
 
         return response.json().get("data", [])
-    
-    def _to_dataframe(self, site_id, data):
+
+    def _to_dataframe(self, site_id: str, data: list):
         """
         Converts the API data list to a Spark DataFrame.
         Adds site_id, _ingested_at, _source, and ingestion_date metadata columns.
         """
         if not data:
             return None
-        
+
         ingested_at = datetime.now(timezone.utc).isoformat()
 
         # Add site_id to each record before creating the DataFrame
-        enriched = [{**row, "site_id": site_id for row in data}]
+        enriched = [{**row, "site_id": site_id} for row in data]
 
         df = self.spark.createDataFrame(enriched)
         df = (
             df
             .withColumn("_ingested_at", F.lit(ingested_at))
-            .withColumn("source", F.lit("api"))
+            .withColumn("_source", F.lit("api"))
             .withColumn("ingestion_date", F.current_date())
             .withColumn(
                 "year_month",
                 F.date_format(
                     F.to_timestamp(F.col("timestamp")),
                     "yyyy-MM"
-                ) 
+                )
             )
         )
 
         return df
-    
-    def run(self):
-        """
-        Main orchestration loop.
-        For each site_id, fetches all outstanding months and writes to Bronze Parquet.
-        Logs every attempt and updates the watermark on success.
-        """
-        output_path = f"{self.config.bronze_root}/api/{self.endpoint}"
 
-        for site_id in self.site_ids:
-            months = self._get_months_to_fetch(site_id)
+   def run(self) -> list:
+    output_path = f"{self.config.bronze_root}/api/{self.endpoint_name}"
+    all_results = []
 
-            for from_ts, to_ts in months:
-                year_month = from_ts.strftime("%Y-%m")
-                started_at = datetime.now(timezone.utc).replace(tzinfo=None)
+    for site_id in self.site_ids:
+        months = self._get_months_to_fetch(site_id)
 
-                try:
-                    data = self._fetch_month(site_id, from_ts, to_ts)
+        for from_ts, to_ts in months:
+            year_month = from_ts.strftime("%Y-%m")
+            started_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
-                    if not data:
-                        self.logger.log(
-                            endpoint=self.endpoint_name,
-                            site_id=site_id,
-                            year_month=year_month,
-                            rows_written=0,
-                            status="success",
-                            error_message=None,
-                            started_at=started_at,
-                            finished_at=datetime.now(timezone.utc).replace(tzinfo=None),
-                        )
-                        self.watermark.update(self.endpoint_name, site_id, to_ts)
-                        continue
-                
-                    df = self._to_dataframe(site_id, data)
+            try:
+                data = self._fetch_month(site_id, from_ts, to_ts)
+                df = self._to_dataframe(site_id, data)
+                rows_written = 0
 
-                    (
-                        df.write
-                        .mode("overwrite")
-                        .partitionBy("year_month","site_id")
-                        .parquet(output_path)
-                    )
-
+                if df is not None:
+                    df.write.mode("overwrite").partitionBy("year_month", "site_id").parquet(output_path)
                     rows_written = df.count()
 
-                    self.watermark.update(self.endpoint_name, site_id, to_ts)
+                finished_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
-                    self.logger.log(
-                        endpoint=self.endpoint_name,
-                        site_id=site_id,
-                        year_month=year_month,
-                        rows_written=rows_written,
-                        status="success",
-                        error_message=None,
-                        started_at=started_at,
-                        finished_at=datetime.now(timezone.utc).replace(tzinfo=None),
-                    )
+                self.watermark.update(self.endpoint_name, site_id, to_ts)
+                self.logger.log(self.endpoint_name, site_id, year_month, rows_written, "success", None, started_at, finished_at)
 
-                    print(f"Successssss: {self.endpoint_name} | {site_id} | {year_month} | {rows_written:,} rows")
+                all_results.append(IngestionResult(
+                    source="api",
+                    table=f"{self.endpoint_name}/{site_id}/{year_month}",
+                    rows_written=rows_written,
+                    output_path=output_path,
+                    started_at=started_at,
+                    finished_at=finished_at,
+                    success=True,
+                ))
 
-                except Exception as e:
-                    self.logger.log(
-                        endpoint=self.endpoint_name,
-                        site_id=site_id,
-                        year_month=year_month,
-                        rows_written=0,
-                        status="failed",
-                        error_message=str(e),
-                        started_at=started_at,
-                        finished_at=datetime.now(timezone.utc).replace(tzinfo=None),
-                    )
-                    print(f"Failed!!!!!!!: {self.endpoint_name} | {site_id} | {year_month} | ERROR: {e}")
+                print(f"  ✓ {self.endpoint_name} | {site_id} | {year_month} | {rows_written:,} rows")
 
+            except Exception as e:
+                finished_at = datetime.now(timezone.utc).replace(tzinfo=None)
+                self.logger.log(self.endpoint_name, site_id, year_month, 0, "failed", str(e), started_at, finished_at)
+
+                all_results.append(IngestionResult(
+                    source="api",
+                    table=f"{self.endpoint_name}/{site_id}/{year_month}",
+                    rows_written=0,
+                    output_path=output_path,
+                    started_at=started_at,
+                    finished_at=finished_at,
+                    success=False,
+                    error=str(e),
+                ))
+
+                print(f"  ✗ {self.endpoint_name} | {site_id} | {year_month} | ERROR: {e}")
+
+    return all_results
