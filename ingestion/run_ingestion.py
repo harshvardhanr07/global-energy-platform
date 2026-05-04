@@ -68,6 +68,21 @@ def run_db(spark) -> list:
         results.append(ingestor.run())
     return results
 
+def run_timeseries_api(spark) -> list:
+    # Tables seeded by fake_data_platform db_seeder
+    tables = {
+        "site_profile":         "public.site_profile",
+        "site_occupancy":       "public.site_occupancy",
+        "site_profile_history": "public.site_profile_history",
+        "site_status_history":  "public.site_status_history",
+    }
+    results = []
+    for table_name, db_table in tables.items():
+        config = BronzeConfig(bronze_root=BRONZE_ROOT, source_name="db", table_name=table_name)
+        ingestor = DbIngestor(spark, config, jdbc_url=DB_JDBC_URL, db_table=db_table, db_user=DB_USER, db_password=DB_PASSWORD)
+        results.append(ingestor.run())
+    return results
+
 
 def main():
     spark = get_spark()
@@ -78,6 +93,7 @@ def main():
     results.extend(run_csv(spark))
     results.extend(run_api(spark))
     results.extend(run_db(spark))
+    results.extend(run_timeseries_api(spark))
 
     spark.stop()
 
