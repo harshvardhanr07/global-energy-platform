@@ -1,3 +1,5 @@
+from datetime import datetime
+
 class WatermarkManager():
 
     def __init__(self, conn):
@@ -6,7 +8,7 @@ class WatermarkManager():
     def get(self, endpoint, site_id):
         cursor = self.conn.cursor()
         cursor.execute("""
-            SELECT last_year_month FROM ingestion_watermark
+            SELECT last_ingested_ts FROM ingestion_watermark
             WHERE
                 endpoint = %s
                 and site_id = %s
@@ -17,20 +19,20 @@ class WatermarkManager():
         if response:
             return response[0]
         else:
-            return "2024-04"
+            return datetime(2024, 4, 1, 0, 0, 0)
         
-    def update(self, endpoint, site_id, year_month):
+    def update(self, endpoint, site_id, last_ingested_ts ):
         cursor = self.conn.cursor()
         cursor.execute("""
             INSERT INTO 
-                ingestion_watermark (endpoint, site_id, last_year_month, updated_at)
+                ingestion_watermark (endpoint, site_id, last_ingested_ts, updated_at)
             VALUES
                 (%s, %s, %s, NOW())
             ON CONFLICT(endpoint, site_id)
             DO UPDATE SET
-                last_year_month = %s,
+                last_ingested_ts = %s,
                 updated_at = NOW()
-        """, (endpoint, site_id, year_month, year_month))
+        """, (endpoint, site_id, last_ingested_ts , last_ingested_ts ))
 
         self.conn.commit()
         cursor.close()
