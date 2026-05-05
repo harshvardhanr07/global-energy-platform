@@ -1,5 +1,5 @@
 import requests
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from calendar import monthrange
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
@@ -56,6 +56,9 @@ class TimeSeriesApiIngestor:
 
             # Only fetch from where we left off within the first month
             from_ts = last_ingested_ts if (year == start_year and month == start_month) else month_start
+
+            if from_ts >= month_end:
+                continue
 
             months.append((from_ts, month_end))
 
@@ -118,58 +121,58 @@ class TimeSeriesApiIngestor:
 
         return df
 
-   def run(self) -> list:
-    output_path = f"{self.config.bronze_root}/api/{self.endpoint_name}"
-    all_results = []
+    def run(self) -> list:
+        output_path = f"{self.config.bronze_root}/api/{self.endpoint_name}"
+        all_results = []
 
-    for site_id in self.site_ids:
-        months = self._get_months_to_fetch(site_id)
+        for site_id in self.site_ids:
+            months = self._get_months_to_fetch(site_id)
 
-        for from_ts, to_ts in months:
-            year_month = from_ts.strftime("%Y-%m")
-            started_at = datetime.now(timezone.utc).replace(tzinfo=None)
+            for from_ts, to_ts in months:
+                year_month = from_ts.strftime("%Y-%m")
+                started_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
-            try:
-                data = self._fetch_month(site_id, from_ts, to_ts)
-                df = self._to_dataframe(site_id, data)
-                rows_written = 0
+                try:
+                    data = self._fetch_month(site_id, from_ts, to_ts)
+                    df = self._to_dataframe(site_id, data)
+                    rows_written = 0
 
-                if df is not None:
-                    df.write.mode("overwrite").partitionBy("year_month", "site_id").parquet(output_path)
-                    rows_written = df.count()
+                    if df is not None:
+                        df.coalesce(1).write.mode("overwrite").partitionBy("year_month", "site_id").parquet(output_path)
+                        rows_written = df.count()
 
-                finished_at = datetime.now(timezone.utc).replace(tzinfo=None)
+                    finished_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
-                self.watermark.update(self.endpoint_name, site_id, to_ts)
-                self.logger.log(self.endpoint_name, site_id, year_month, rows_written, "success", None, started_at, finished_at)
+                    self.watermark.update(self.endpoint_name, site_id, to_ts)
+                    self.logger.log(self.endpoint_name, site_id, year_month, rows_written, "success", None, started_at, finished_at)
 
-                all_results.append(IngestionResult(
-                    source="api",
-                    table=f"{self.endpoint_name}/{site_id}/{year_month}",
-                    rows_written=rows_written,
-                    output_path=output_path,
-                    started_at=started_at,
-                    finished_at=finished_at,
-                    success=True,
-                ))
+                    all_results.append(IngestionResult(
+                        source="api",
+                        table=f"{self.endpoint_name}/{site_id}/{year_month}",
+                        rows_written=rows_written,
+                        output_path=output_path,
+                        started_at=started_at,
+                        finished_at=finished_at,
+                        success=True,
+                    ))
 
-                print(f"  ✓ {self.endpoint_name} | {site_id} | {year_month} | {rows_written:,} rows")
+                    print(f"  ✓ {self.endpoint_name} | {site_id} | {year_month} | {rows_written:,} rows")
 
-            except Exception as e:
-                finished_at = datetime.now(timezone.utc).replace(tzinfo=None)
-                self.logger.log(self.endpoint_name, site_id, year_month, 0, "failed", str(e), started_at, finished_at)
+                except Exception as e:
+                    finished_at = datetime.now(timezone.utc).replace(tzinfo=None)
+                    self.logger.log(self.endpoint_name, site_id, year_month, 0, "failed", str(e), started_at, finished_at)
 
-                all_results.append(IngestionResult(
-                    source="api",
-                    table=f"{self.endpoint_name}/{site_id}/{year_month}",
-                    rows_written=0,
-                    output_path=output_path,
-                    started_at=started_at,
-                    finished_at=finished_at,
-                    success=False,
-                    error=str(e),
-                ))
+                    all_results.append(IngestionResult(
+                        source="api",
+                        table=f"{self.endpoint_name}/{site_id}/{year_month}",
+                        rows_written=0,
+                        output_path=output_path,
+                        started_at=started_at,
+                        finished_at=finished_at,
+                        success=False,
+                        error=str(e),
+                    ))
 
-                print(f"  ✗ {self.endpoint_name} | {site_id} | {year_month} | ERROR: {e}")
+                    print(f"  ✗ {self.endpoint_name} | {site_id} | {year_month} | ERROR: {e}")
 
-    return all_results
+        return all_results
