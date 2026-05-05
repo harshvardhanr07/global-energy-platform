@@ -10,7 +10,7 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip3 install -r requirements.txt
 
-COPY . /app/ingestion/
+COPY . /app/
 
 RUN mkdir -p /data/bronze /data/raw/csv
 

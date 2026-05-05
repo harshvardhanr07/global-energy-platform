@@ -4,7 +4,7 @@
 # and land them as raw Parquet in the Bronze layer.
 # Supports parallel reads via partition_column for large tables.
 
-from ingestion.base.base_ingestor import BaseIngestor, BronzeConfig
+from base.base_ingestor import BaseIngestor, BronzeConfig
 from pyspark.sql import SparkSession, DataFrame
 
 

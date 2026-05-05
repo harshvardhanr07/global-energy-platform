@@ -4,7 +4,7 @@
 # and lands them as raw Parquet in the Bronze layer.
 
 import requests
-from ingestion.base.base_ingestor import BaseIngestor, BronzeConfig
+from base.base_ingestor import BaseIngestor, BronzeConfig
 from pyspark.sql import SparkSession, DataFrame
 
 

@@ -3,7 +3,7 @@
 # Reads one or more CSV files from a path or glob pattern and
 # lands them as raw Parquet in the Bronze layer.
 
-from ingestion.base.base_ingestor import BaseIngestor, BronzeConfig
+from base.base_ingestor import BaseIngestor, BronzeConfig
 from pyspark.sql import SparkSession, DataFrame
 
 
