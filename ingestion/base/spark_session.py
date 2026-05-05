@@ -17,23 +17,18 @@ def get_spark(app_name: str = "GlobalEnergyPlatform") -> SparkSession:
         .master("local[*]")                  # use all available cores in Docker
 
         # ── Serialisation & compression ──────────────────────────────────────
-        .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer")  # faster than Java default
-        .config("spark.sql.parquet.compression.codec", "snappy")                   # compressed Parquet output
-<<<<<<< HEAD
+        .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
+        .config("spark.sql.parquet.compression.codec", "snappy")
 
         # ── Local mode tuning ────────────────────────────────────────────────
-        .config("spark.sql.shuffle.partitions", "4")   # low value for single-node Docker
-        .config("spark.driver.memory", "2g")           # memory cap for Docker container
-        .config("spark.sql.adaptive.enabled", "true")  # let Spark optimise query plans
+        .config("spark.sql.shuffle.partitions", "4")
+        .config("spark.driver.memory", "2g")
+        .config("spark.sql.adaptive.enabled", "true")
 
-        # ── PostgreSQL JDBC driver ────────────────────────────────────────────
-        # Downloaded by Spark at session start via Maven Central
-        # Required for db_ingestor.py JDBC reads
-        .config("spark.jars.packages", "org.postgresql:postgresql:42.7.3")
+        # ── JARs — PostgreSQL JDBC + AWS S3A ─────────────────────────────────
+        .config("spark.jars.packages", "org.postgresql:postgresql:42.7.3,org.apache.hadoop:hadoop-aws:3.3.4,com.amazonaws:aws-java-sdk-bundle:1.12.262")
 
         # ── AWS S3 connectivity ───────────────────────────────────────────────
-        # Credentials injected from environment variables via docker-compose
-        # hadoop-aws and aws-java-sdk JARs are pre-downloaded in the Dockerfile
         .config("spark.hadoop.fs.s3a.access.key", os.environ.get("AWS_ACCESS_KEY_ID", ""))
         .config("spark.hadoop.fs.s3a.secret.key", os.environ.get("AWS_SECRET_ACCESS_KEY", ""))
         .config("spark.hadoop.fs.s3a.endpoint", "s3.amazonaws.com")
@@ -43,12 +38,5 @@ def get_spark(app_name: str = "GlobalEnergyPlatform") -> SparkSession:
             "com.amazonaws.auth.EnvironmentVariableCredentialsProvider"
         )
 
-        .getOrCreate()  # reuse existing session if one already exists
-=======
-        .config("spark.jars.packages", "org.postgresql:postgresql:42.7.3,org.apache.hadoop:hadoop-aws:3.3.4,com.amazonaws:aws-java-sdk-bundle:1.12.262")
-        .config("spark.sql.shuffle.partitions", "4")                               # low value tuned for local mode
-        .config("spark.driver.memory", "2g")                                       # memory cap for Docker container
-        .config("spark.sql.adaptive.enabled", "true")                              # let Spark optimise query plans
-        .getOrCreate()                      # reuse existing session if one already exists
->>>>>>> feature/ingestion-layer
+        .getOrCreate()
     )
