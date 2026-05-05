@@ -35,7 +35,7 @@ class BronzeConfig:
     source_name: str = ""
     table_name: str = ""
     partition_by: list = None
-    write_mode: str = "append"
+    write_mode: str = "overwrite"
 
     def __post_init__(self):
         # Default partition_by here to avoid mutable default argument issue
