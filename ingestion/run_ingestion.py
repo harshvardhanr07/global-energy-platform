@@ -12,15 +12,13 @@ import sys
 import psycopg2
 from base.spark_session import get_spark
 from base.base_ingestor import BronzeConfig, IngestionResult
-from base.watermark import WatermarkManager
-from base.ingestion_log import IngestionLogger
 from jobs.csv_ingestor import CsvIngestor
 from jobs.api_ingestor import ApiIngestor
 from jobs.db_ingestor import DbIngestor
 from jobs.timeseries_api_ingestor import TimeSeriesApiIngestor
 
 # ── Environment variables ────────────────────────────────────────────────────
-BRONZE_ROOT  = os.getenv("BRONZE_ROOT",  "/data/bronze")
+BRONZE_ROOT  = os.getenv("BRONZE_ROOT",   "/data/bronze")
 CSV_DIR      = os.getenv("CSV_INPUT_DIR", "/data/raw/csv")
 API_BASE_URL = os.getenv("API_BASE_URL",  "http://api_simulator:8000")
 DB_JDBC_URL  = os.getenv("DB_JDBC_URL",   "jdbc:postgresql://postgres:5432/energy_fake")
@@ -86,6 +84,11 @@ def run_db(spark) -> list:
 
 
 def run_timeseries_api(spark, db_conn) -> list:
+    """
+    Ingest per-site time series data from the API simulator.
+    Uses watermark tracking for incremental monthly loads.
+    Covers two endpoints: consumption and temperature.
+    """
     results = []
     for endpoint_name in ["consumption", "temperature"]:
         config = BronzeConfig(
@@ -104,6 +107,7 @@ def run_timeseries_api(spark, db_conn) -> list:
         results.extend(ingestor.run())
     return results
 
+
 def main():
     spark = get_spark("GEP-Ingestion")
 
@@ -116,7 +120,7 @@ def main():
         password=DB_PASSWORD,
     )
 
-    all_results: list = []
+    all_results = []
 
     try:
         # Run all sources — failures inside each ingestor are caught individually
@@ -137,10 +141,12 @@ def main():
     failures = 0
     for r in all_results:
         status = "✓" if r.success else "✗"
-        print(f"  {status}  {r.source:<6} / {r.table:<25}  {r.rows_written:>6} rows")
+        print(f"  {status}  {r.source:<6} / {r.table:<35}  {r.rows_written:>6} rows")
         if not r.success:
             print(f"      ERROR: {r.error}")
             failures += 1
+    print("=" * 60)
+    print(f"  Total: {len(all_results)} jobs, {sum(1 for r in all_results if r.success)} succeeded, {failures} failed")
     print("=" * 60)
 
     # Exit with error code if any ingestion failed — useful for Airflow later
