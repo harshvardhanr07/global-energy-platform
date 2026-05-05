@@ -69,9 +69,7 @@ class BaseIngestor(ABC):
 
     def _output_path(self) -> str:
         # Builds the Bronze output path: bronze_root/source_name/table_name
-        return str(
-            Path(self.config.bronze_root) / self.config.source_name / self.config.table_name
-        )
+        return f"{self.config.bronze_root}/{self.config.source_name}/{self.config.table_name}"
 
     def run(self) -> IngestionResult:
         # Orchestrates the full ingestion:
