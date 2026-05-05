@@ -23,7 +23,8 @@ def get_spark(app_name: str = "GlobalEnergyPlatform") -> SparkSession:
         # ── Local mode tuning ────────────────────────────────────────────────
         .config("spark.sql.shuffle.partitions", "4")   # low value for single-node Docker
         .config("spark.driver.memory", "2g")           # memory cap for Docker container
-        .config("spark.sql.adaptive.enabled", "true")  # let Spark optimise query plans
+        .config("spark.sql.adaptive.enabled", "true")
+        .config("spark.sql.sources.partitionOverwriteMode", "dynamic")  # let Spark optimise query plans
 
         # ── PostgreSQL JDBC driver ────────────────────────────────────────────
         # Downloaded by Spark at session start via Maven Central
@@ -35,7 +36,8 @@ def get_spark(app_name: str = "GlobalEnergyPlatform") -> SparkSession:
         # hadoop-aws and aws-java-sdk JARs are pre-downloaded in the Dockerfile
         .config("spark.hadoop.fs.s3a.access.key", os.environ.get("AWS_ACCESS_KEY_ID", ""))
         .config("spark.hadoop.fs.s3a.secret.key", os.environ.get("AWS_SECRET_ACCESS_KEY", ""))
-        .config("spark.hadoop.fs.s3a.endpoint", "s3.amazonaws.com")
+        .config("spark.hadoop.fs.s3a.endpoint", "s3.eu-west-3.amazonaws.com")
+        .config("spark.hadoop.fs.s3a.region", "eu-west-3")
         .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
         .config(
             "spark.hadoop.fs.s3a.aws.credentials.provider",
