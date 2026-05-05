@@ -3,10 +3,10 @@ from datetime import datetime, timezone, timedelta
 from calendar import monthrange
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
-from base.base_ingestor import BronzeConfig
+from base.base_ingestor import BronzeConfig, IngestionResult
 from base.watermark import WatermarkManager
 from base.ingestion_log import IngestionLogger
-from base.base_ingestor import BronzeConfig, IngestionResult
+
 
 class TimeSeriesApiIngestor:
 
@@ -33,7 +33,7 @@ class TimeSeriesApiIngestor:
     def _get_months_to_fetch(self, site_id: str) -> list:
         """
         Returns a list of (from_ts, to_ts) datetime tuples — one per full calendar month —
-        starting from the month after last_ingested_ts up to and including the current month.
+        starting from last_ingested_ts up to and including the current month.
         """
         last_ingested_ts = self.watermark.get(self.endpoint_name, site_id)
 
@@ -41,7 +41,6 @@ class TimeSeriesApiIngestor:
         current_year = now.year
         current_month = now.month
 
-        # Start from the month of last_ingested_ts (we re-fetch the current partial month)
         start_year = last_ingested_ts.year
         start_month = last_ingested_ts.month
 
@@ -54,15 +53,18 @@ class TimeSeriesApiIngestor:
             last_day = monthrange(year, month)[1]
             month_end = datetime(year, month, last_day, 23, 59, 59)
 
-            # Only fetch from where we left off within the first month
             from_ts = last_ingested_ts if (year == start_year and month == start_month) else month_start
 
             if from_ts >= month_end:
+                if month == 12:
+                    year += 1
+                    month = 1
+                else:
+                    month += 1
                 continue
 
             months.append((from_ts, month_end))
 
-            # Advance to next month
             if month == 12:
                 year += 1
                 month = 1
@@ -94,14 +96,12 @@ class TimeSeriesApiIngestor:
     def _to_dataframe(self, site_id: str, data: list):
         """
         Converts the API data list to a Spark DataFrame.
-        Adds site_id, _ingested_at, _source, and ingestion_date metadata columns.
+        Adds site_id, _ingested_at, _source, ingestion_date, and year_month columns.
         """
         if not data:
             return None
 
         ingested_at = datetime.now(timezone.utc).isoformat()
-
-        # Add site_id to each record before creating the DataFrame
         enriched = [{**row, "site_id": site_id} for row in data]
 
         df = self.spark.createDataFrame(enriched)
@@ -122,6 +122,11 @@ class TimeSeriesApiIngestor:
         return df
 
     def run(self) -> list:
+        """
+        Main orchestration loop.
+        For each site_id, fetches all outstanding months and writes to Bronze Parquet.
+        Logs every attempt and updates the watermark on success.
+        """
         output_path = f"{self.config.bronze_root}/api/{self.endpoint_name}"
         all_results = []
 
@@ -156,7 +161,7 @@ class TimeSeriesApiIngestor:
                         success=True,
                     ))
 
-                    print(f"  ✓ {self.endpoint_name} | {site_id} | {year_month} | {rows_written:,} rows")
+                    print(f"  ✓ {self.endpoint_name} | {site_id} | {year_month} | {rows_written:,} rows", flush=True)
 
                 except Exception as e:
                     finished_at = datetime.now(timezone.utc).replace(tzinfo=None)
@@ -173,6 +178,6 @@ class TimeSeriesApiIngestor:
                         error=str(e),
                     ))
 
-                    print(f"  ✗ {self.endpoint_name} | {site_id} | {year_month} | ERROR: {e}")
+                    print(f"  ✗ {self.endpoint_name} | {site_id} | {year_month} | ERROR: {e}", flush=True)
 
         return all_results
