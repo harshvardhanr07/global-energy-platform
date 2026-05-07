@@ -33,7 +33,7 @@ class ApiIngestor(BaseIngestor):
         payload = response.json()
         if isinstance(payload, list):
             return payload
-        return payload.get("data", [])  # unwrap {"data": [...]} envelope
+        return payload.get("data", [])  # unwrap {"data": [...]} 
 
     def _paginate(self) -> list:
         # Loops through all pages until the API returns an empty page
