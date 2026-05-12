@@ -1,0 +1,157 @@
+
+<style>
+.gep{padding:16px 0;font-family:var(--font-sans)}
+.tier-label{font-size:10px;font-weight:500;letter-spacing:.07em;text-transform:uppercase;color:var(--color-text-tertiary);margin:0 0 6px 2px}
+.row{display:flex;gap:8px;margin-bottom:6px}
+.card{flex:1;border:.5px solid var(--color-border-tertiary);border-radius:8px;padding:9px 11px;background:var(--color-background-secondary);min-width:0}
+.ct{font-weight:500;font-size:12px;color:var(--color-text-primary);margin-bottom:2px}
+.cs{font-size:11px;color:var(--color-text-secondary);line-height:1.5}
+.cm{font-size:10px;font-family:var(--font-mono);color:var(--color-text-tertiary);margin-top:3px}
+.tag{display:inline-block;font-size:10px;padding:1px 6px;border-radius:10px;margin-top:4px;font-weight:500}
+.t-csv{background:#EAF3DE;color:#3B6D11}.t-api{background:#E6F1FB;color:#185FA5}.t-db{background:#FAEEDA;color:#854F0B}.t-ts{background:#EEEDFE;color:#534AB7}
+@media(prefers-color-scheme:dark){.t-csv{background:#27500A;color:#C0DD97}.t-api{background:#0C447C;color:#B5D4F4}.t-db{background:#633806;color:#FAC775}.t-ts{background:#3C3489;color:#CECBF6}}
+.orch{border:.5px solid var(--color-border-secondary);border-radius:8px;padding:10px 14px;background:var(--color-background-secondary);margin-bottom:8px;display:flex;align-items:center;justify-content:space-between}
+.ot{font-weight:500;font-size:13px;color:var(--color-text-primary)}
+.os{font-size:11px;color:var(--color-text-secondary)}
+.pill{display:inline-block;font-size:10px;padding:2px 8px;border-radius:10px;border:.5px solid var(--color-border-tertiary);color:var(--color-text-secondary);background:var(--color-background-primary);margin:2px 3px 2px 0}
+.pills{margin:2px 0 12px}
+.arr{text-align:center;font-size:16px;color:var(--color-text-tertiary);padding:2px 0;line-height:1}
+.bronze-wrap{border:.5px solid var(--color-border-secondary);border-radius:8px;padding:12px;background:var(--color-background-secondary);margin-bottom:6px}
+.bronze-head{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.bh{font-weight:500;font-size:13px;color:var(--color-text-primary)}
+.bdone{font-size:10px;padding:2px 7px;border-radius:10px;background:#EAF3DE;color:#3B6D11;font-weight:500}
+@media(prefers-color-scheme:dark){.bdone{background:#27500A;color:#C0DD97}}
+.bpaths{display:flex;flex-wrap:wrap;gap:6px}
+.bp{font-size:10px;padding:3px 8px;border-radius:4px;border:.5px solid var(--color-border-tertiary);color:var(--color-text-secondary);background:var(--color-background-primary);font-family:var(--font-mono)}
+.next{border:.5px solid var(--color-border-secondary);border-radius:8px;padding:10px 14px;background:var(--color-background-secondary);margin-bottom:6px;display:flex;justify-content:space-between;align-items:center}
+.fut{border:.5px dashed var(--color-border-tertiary);border-radius:8px;padding:10px 14px;opacity:.6;display:flex;justify-content:space-between;align-items:center}
+.ntag{font-size:10px;padding:2px 7px;border-radius:10px;font-weight:500}
+.n-next{background:#E6F1FB;color:#185FA5}
+.n-fut{background:var(--color-background-tertiary);color:var(--color-text-tertiary)}
+@media(prefers-color-scheme:dark){.n-next{background:#0C447C;color:#B5D4F4}}
+.nt{font-weight:500;font-size:13px;color:var(--color-text-primary)}
+.ns{font-size:11px;color:var(--color-text-secondary)}
+.pg-note{display:flex;align-items:flex-start;gap:8px;margin:8px 0 4px;padding:7px 10px;border-radius:6px;background:var(--color-background-tertiary);border:.5px solid var(--color-border-tertiary)}
+.pn-t{font-size:11px;font-weight:500;color:var(--color-text-secondary)}
+.pn-s{font-size:10px;color:var(--color-text-tertiary);margin-top:1px}
+.divider{border:none;border-top:.5px solid var(--color-border-tertiary);margin:10px 0}
+</style>
+
+<div class="gep">
+
+<div class="tier-label">Data sources — fake data platform</div>
+<div class="row">
+  <div class="card">
+    <div class="ct">CSV generator</div>
+    <div class="cs">Monthly invoice files on disk</div>
+    <div class="cm">/data/raw/csv/invoices_*.csv</div>
+    <div><span class="tag t-csv">CSV</span></div>
+  </div>
+  <div class="card">
+    <div class="ct">API simulator</div>
+    <div class="cs">FastAPI on port 8000</div>
+    <div class="cm">GET /sites<br>GET /site/{id}/consumption<br>GET /site/{id}/temperature</div>
+    <div><span class="tag t-api">REST API</span></div>
+  </div>
+  <div class="card">
+    <div class="ct">PostgreSQL</div>
+    <div class="cs">4 seeded tables</div>
+    <div class="cm">site_profile · site_occupancy<br>site_profile_history<br>site_status_history</div>
+    <div><span class="tag t-db">PostgreSQL 15</span></div>
+  </div>
+</div>
+
+<div class="arr">↓</div>
+
+<div class="tier-label">Bronze ingestion layer — ingestion/</div>
+
+<div class="orch">
+  <div>
+    <div class="ot">run_ingestion.py</div>
+    <div class="os">Orchestrator — calls all four runners, prints summary, exits 1 on failure</div>
+  </div>
+  <div class="os" style="text-align:right;flex-shrink:0;margin-left:12px">entry point</div>
+</div>
+
+<div class="row">
+  <div class="card">
+    <div class="ct">csv_ingestor.py</div>
+    <div class="cs">CsvIngestor<br>Reads CSV glob → Parquet</div>
+    <div><span class="tag t-csv">invoices</span></div>
+  </div>
+  <div class="card">
+    <div class="ct">api_ingestor.py</div>
+    <div class="cs">ApiIngestor<br>Hits /sites once → Parquet</div>
+    <div><span class="tag t-api">sites</span></div>
+  </div>
+  <div class="card">
+    <div class="ct">timeseries_api_ingestor.py</div>
+    <div class="cs">TimeSeriesApiIngestor<br>Per-site, per-month loop with watermark</div>
+    <div><span class="tag t-ts">consumption · temperature</span></div>
+  </div>
+  <div class="card">
+    <div class="ct">db_ingestor.py</div>
+    <div class="cs">DbIngestor<br>JDBC full read → Parquet</div>
+    <div><span class="tag t-db">4 tables</span></div>
+  </div>
+</div>
+
+<div class="tier-label" style="margin-top:8px">Supporting base files</div>
+<div class="pills">
+  <span class="pill">base/spark_session.py — SparkSession factory (S3A + PostgreSQL JARs)</span>
+  <span class="pill">base/base_ingestor.py — BaseIngestor ABC + BronzeConfig + IngestionResult</span>
+  <span class="pill">base/watermark.py — WatermarkManager (reads/upserts last_ingested_ts per site)</span>
+  <span class="pill">base/ingestion_log.py — IngestionLogger (inserts one row per attempt)</span>
+</div>
+
+<div class="pg-note">
+  <div>
+    <div class="pn-t">PostgreSQL tracking tables (timeseries only)</div>
+    <div class="pn-s">ingestion_watermark — stores last_ingested_ts per (endpoint, site_id) &nbsp;·&nbsp; ingestion_log — full audit log of every fetch attempt</div>
+  </div>
+</div>
+
+<div class="arr">↓</div>
+
+<div class="tier-label">Bronze layer — s3://gep-datalake-dev/bronze/ ✓ complete</div>
+<div class="bronze-wrap">
+  <div class="bronze-head">
+    <span class="bh">S3 Bronze</span>
+    <span class="bdone">8 tables · ~21.8M rows</span>
+    <span style="font-size:11px;color:var(--color-text-tertiary)">snappy parquet · partitioned</span>
+  </div>
+  <div class="bpaths">
+    <span class="bp">bronze/csv/invoices/ingestion_date=</span>
+    <span class="bp">bronze/api/sites/ingestion_date=</span>
+    <span class="bp">bronze/api/consumption/year_month=/site_id=</span>
+    <span class="bp">bronze/api/temperature/year_month=/site_id=</span>
+    <span class="bp">bronze/db/site_profile/ingestion_date=</span>
+    <span class="bp">bronze/db/site_occupancy/ingestion_date=</span>
+    <span class="bp">bronze/db/site_profile_history/ingestion_date=</span>
+    <span class="bp">bronze/db/site_status_history/ingestion_date=</span>
+  </div>
+</div>
+
+<div class="arr">↓</div>
+
+<div class="tier-label">Silver layer — s3://gep-datalake-dev/silver/</div>
+<div class="next">
+  <div>
+    <div class="nt">Silver layer</div>
+    <div class="ns">Type casting · deduplication · null handling · derived columns · validation</div>
+  </div>
+  <span class="ntag n-next">next phase</span>
+</div>
+
+<div class="arr">↓</div>
+
+<div class="tier-label">Gold layer — s3://gep-datalake-dev/gold/</div>
+<div class="fut">
+  <div>
+    <div class="nt">Gold layer</div>
+    <div class="ns">Aggregations · business metrics · analytics-ready wide tables</div>
+  </div>
+  <span class="ntag n-fut">future</span>
+</div>
+
+</div>

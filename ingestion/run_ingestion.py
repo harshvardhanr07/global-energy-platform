@@ -122,7 +122,7 @@ def main():
         password=DB_PASSWORD,
     )
 
-    all_results: list = []
+    all_results = []
 
     try:
         # Run all sources — failures inside each ingestor are caught individually
@@ -147,6 +147,8 @@ def main():
         if not r.success:
             print(f"      ERROR: {r.error}")
             failures += 1
+    print("=" * 60)
+    print(f"  Total: {len(all_results)} jobs, {sum(1 for r in all_results if r.success)} succeeded, {failures} failed")
     print("=" * 60)
 
     # Exit with error code if any ingestion failed — useful for Airflow later

@@ -30,11 +30,19 @@ class IngestionResult:
 class BronzeConfig:
     # Holds all configuration needed to write a Bronze Parquet table
     # Each ingestor receives one of these at construction time
+<<<<<<< HEAD
     bronze_root: str = "/data/bronze"   # root path — set to s3a:// in production
     source_name: str = ""               # source identifier: csv, api, or db
     table_name: str = ""                # output table name e.g. invoices
     partition_by: list = None           # Parquet partition columns
     write_mode: str = "append"          # append | overwrite
+=======
+    bronze_root: str = "/data/bronze"
+    source_name: str = ""
+    table_name: str = ""
+    partition_by: list = None
+    write_mode: str = "overwrite"
+>>>>>>> feature/ingestion-layer
 
     def __post_init__(self):
         # Set default here to avoid mutable default argument issue with dataclasses
@@ -69,9 +77,13 @@ class BaseIngestor(ABC):
 
     def _output_path(self) -> str:
         # Builds the Bronze output path: bronze_root/source_name/table_name
+<<<<<<< HEAD
         # IMPORTANT: uses string join not pathlib.Path — Path collapses
         # s3a://bucket into s3a:/bucket (strips one slash), breaking S3 writes
         return f"{self.config.bronze_root.rstrip('/')}/{self.config.source_name}/{self.config.table_name}"
+=======
+        return f"{self.config.bronze_root}/{self.config.source_name}/{self.config.table_name}"
+>>>>>>> feature/ingestion-layer
 
     def run(self) -> IngestionResult:
         # Orchestrates the full ingestion:
