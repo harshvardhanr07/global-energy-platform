@@ -16,17 +16,40 @@ services:
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
       - AWS_REGION=${AWS_REGION}
-      - SILVER_PATH=${SILVER_PATH}
     volumes:
       - bronze_data:/data/bronze
       - ~/projects/global-energy-platform/fake_data_platform/output/csv:/data/raw/csv
+      - ~/projects/global-energy-platform/ingestion:/app/ingestion
+    networks:
+      - fake_data_platform_energy_network
+    restart: "no"
+
+  silver:
+    build:
+      context: .
+      network: host
+    container_name: gep-silver
+    env_file:
+      - .env
+    environment:
+      - BRONZE_ROOT=${BRONZE_ROOT}
+      - SILVER_ROOT=${SILVER_ROOT}
+      - DB_JDBC_URL=${DB_JDBC_URL}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_REGION=${AWS_REGION}
+    volumes:
+      - bronze_data:/data/bronze
+      - ~/projects/global-energy-platform/silver:/app/silver
+    command: python silver/run_silver.py
     networks:
       - fake_data_platform_energy_network
     restart: "no"
 
 volumes:
   bronze_data:
-  csv_raw:
 
 networks:
   fake_data_platform_energy_network:
