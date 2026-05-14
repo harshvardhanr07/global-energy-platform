@@ -1,15 +1,14 @@
 services:
-  ingestion:
+  silver:
     build:
-      context: .
+      context: ../ingestion
       network: host
-    container_name: gep-ingestion
+    container_name: gep-silver
     env_file:
       - .env
     environment:
       - BRONZE_ROOT=${BRONZE_ROOT}
-      - CSV_INPUT_DIR=${CSV_INPUT_DIR}
-      - API_BASE_URL=${API_BASE_URL}
+      - SILVER_ROOT=${SILVER_ROOT}
       - DB_JDBC_URL=${DB_JDBC_URL}
       - DB_USER=${DB_USER}
       - DB_PASSWORD=${DB_PASSWORD}
@@ -18,14 +17,15 @@ services:
       - AWS_REGION=${AWS_REGION}
     volumes:
       - bronze_data:/data/bronze
-      - ~/projects/global-energy-platform/fake_data_platform/output/csv:/data/raw/csv
-      - ~/projects/global-energy-platform/ingestion:/app/ingestion
+      - ~/projects/global-energy-platform/silver:/app/silver
+    command: python silver/run_silver.py
     networks:
       - fake_data_platform_energy_network
     restart: "no"
 
 volumes:
   bronze_data:
+    external: true
 
 networks:
   fake_data_platform_energy_network:
