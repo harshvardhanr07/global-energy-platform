@@ -7,7 +7,7 @@ import logging
 from datetime import datetime, timezone
 
 from pyspark.sql import DataFrame, functions as F
-from pyspark.sql.types import StructType
+from pyspark.sql.types import StructType, TimestampType
 
 logger = logging.getLogger(__name__)
 
@@ -73,3 +73,15 @@ def add_silver_metadata(df: DataFrame) -> DataFrame:
     """Append _silver_processed_at timestamp to every Silver row."""
     now = datetime.now(timezone.utc)
     return df.withColumn("_silver_processed_at", F.lit(now).cast("timestamp"))
+
+
+def unix_to_timestamp(df: DataFrame, unix_col: str, output_col: str) -> DataFrame:
+    """
+    Convert a unix epoch integer column (seconds) to TimestampType.
+    Uses F.from_unixtime() which is safe across all Spark versions.
+    Call this before enforce_schema() on consumption and temperature.
+    """
+    return df.withColumn(
+        output_col,
+        F.from_unixtime(F.col(unix_col)).cast(TimestampType())
+    )

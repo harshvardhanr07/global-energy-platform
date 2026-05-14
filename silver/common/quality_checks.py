@@ -91,11 +91,11 @@ def assert_range(
     return df.filter(~condition), violations
 
 
-def assert_unique(df: DataFrame, keys: list, table: str) -> list:
+def assert_unique(df: DataFrame, keys: list, table: str) -> tuple[DataFrame, list]:
     """
     Check for duplicate rows on the given key columns.
     Does NOT remove rows — just reports. Deduplication is handled by silver_utils.deduplicate().
-    Returns violation messages.
+    Returns (df, violation_messages) to be compatible with run_checks.
     """
     violations = []
     total = df.count()
@@ -107,7 +107,7 @@ def assert_unique(df: DataFrame, keys: list, table: str) -> list:
         violations.append(msg)
         logger.warning("[%s] assert_unique: %s", table, msg)
 
-    return violations
+    return df, violations
 
 
 def run_checks(df: DataFrame, table: str, checks: list) -> tuple[DataFrame, DQResult]:
