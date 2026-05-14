@@ -1,0 +1,50 @@
+# spark_session.py
+# Factory function that builds or reuses a SparkSession.
+# All ingestion jobs call get_spark() rather than creating sessions directly.
+# Configured for:
+#   - local Docker mode (single node, all cores)
+#   - AWS S3 writes via s3a:// using hadoop-aws JARs
+#   - PostgreSQL JDBC reads via spark.jars.packages
+
+import os
+from pyspark.sql import SparkSession
+
+
+def get_spark(app_name: str = "GlobalEnergyPlatform") -> SparkSession:
+    return (
+        SparkSession.builder
+        .appName(app_name)
+        .master("local[*]")                  # use all available cores in Docker
+
+        # ── Serialisation & compression ──────────────────────────────────────
+        .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
+        .config("spark.sql.parquet.compression.codec", "snappy")
+
+        # ── Local mode tuning ────────────────────────────────────────────────
+<<<<<<< HEAD
+        .config("spark.sql.shuffle.partitions", "4")
+        .config("spark.driver.memory", "2g")
+        .config("spark.sql.adaptive.enabled", "true")
+=======
+        .config("spark.sql.shuffle.partitions", "4")   # low value for single-node Docker
+        .config("spark.driver.memory", "2g")           # memory cap for Docker container
+        .config("spark.sql.adaptive.enabled", "true")
+        .config("spark.sql.sources.partitionOverwriteMode", "dynamic")  # let Spark optimise query plans
+>>>>>>> feature/ingestion-layer
+
+        # ── JARs — PostgreSQL JDBC + AWS S3A ─────────────────────────────────
+        .config("spark.jars.packages", "org.postgresql:postgresql:42.7.3,org.apache.hadoop:hadoop-aws:3.3.4,com.amazonaws:aws-java-sdk-bundle:1.12.262")
+
+        # ── AWS S3 connectivity ───────────────────────────────────────────────
+        .config("spark.hadoop.fs.s3a.access.key", os.environ.get("AWS_ACCESS_KEY_ID", ""))
+        .config("spark.hadoop.fs.s3a.secret.key", os.environ.get("AWS_SECRET_ACCESS_KEY", ""))
+        .config("spark.hadoop.fs.s3a.endpoint", "s3.eu-west-3.amazonaws.com")
+        .config("spark.hadoop.fs.s3a.region", "eu-west-3")
+        .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
+        .config(
+            "spark.hadoop.fs.s3a.aws.credentials.provider",
+            "com.amazonaws.auth.EnvironmentVariableCredentialsProvider"
+        )
+
+        .getOrCreate()
+    )
